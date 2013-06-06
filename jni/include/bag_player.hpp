@@ -71,15 +71,27 @@ class BagPlayer
 public:
     BagPlayer(const std::string &filename) throw(BagException);
     template<class T>
-        void   register_callback(const std::string &topic,
-                typename BagCallbackT<T>::Callback f);
-    void   start_play();
+    void register_callback(const std::string &topic,
+            typename BagCallbackT<T>::Callback f);
+    void unregister_callback(const std::string &topic);
+    void set_start(const ros::Time &start);
+    void set_end(const ros::Time &end);
+    void set_time_scale(double scale);
+    void start_play();
+    ros::Time get_time();
     virtual ~BagPlayer();
 
     Bag bag;
 
 private:
+    ros::Time real_time(const ros::Time &msg_time);
+
     std::map<std::string, BagCallback *> cbs_;
+    ros::Time bag_start_;
+    ros::Time bag_end_;
+    ros::Time last_message_time_;
+    double time_scale_;
+    ros::Time play_start_;
 };
 
 template<class T>

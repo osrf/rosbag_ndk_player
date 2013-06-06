@@ -13,6 +13,8 @@
 
 #include "bag_player.hpp"
 
+rosbag::BagPlayer *bp;
+
 void log(const char *msg, ...) {
     va_list args;
     va_start(args, msg);
@@ -24,14 +26,19 @@ void log(const char *msg, ...) {
 
 void chatters_callback(std_msgs::String::Ptr s) {
     log("chatter message played: %s", s->data.c_str());
+    ros::Time t = bp->get_time();
+    log("time: %fs", t.toSec());
 }
 
 void numbers_callback(std_msgs::Int32::Ptr i) {
     log("numbers message played: %d", i->data);
+    ros::Time t = bp->get_time();
+    log("time: %fs", t.toSec());
 }
 
 void play_bag() {
     rosbag::BagPlayer bag_player("/sdcard/test.bag");
+    bp = &bag_player;
 
     bag_player.register_callback<std_msgs::Int32>("numbers",
             boost::bind(numbers_callback, _1));

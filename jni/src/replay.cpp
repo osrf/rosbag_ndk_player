@@ -4,15 +4,14 @@
 #include <errno.h>
 #include <vector>
 #include <android/log.h>
-#include "rosbag/bag.h"
-#include "rosbag/view.h"
-
-#include "std_msgs/String.h"
-#include "std_msgs/Int32.h"
-
-#include <boost/foreach.hpp>
+#include <boost/bind.hpp>
 
 #include <android_native_app_glue.h>
+
+#include <std_msgs/String.h>
+#include <std_msgs/Int32.h>
+
+#include "bag_player.hpp"
 
 void log(const char *msg, ...) {
     va_list args;
@@ -22,78 +21,12 @@ void log(const char *msg, ...) {
 }
 
 #define LASTERR strerror(errno)
-#define foreach BOOST_FOREACH
 
-namespace rosbag
-{
-    class BagPlayer
-    {
-    public:
-        BagPlayer(const std::string &filename);
-
-        template<class T>
-            void   register_callback(const std::string &topic,
-                    boost::function<void (boost::shared_ptr<T> &)> f);
-
-        void   start_play();
-
-    private:
-        Bag bag_;
-        std::map<std::string, BagCallback *> cbs_;
-    };
-
-    BagPlayer::BagPlayer(const std::string &topic) {
-        //TODO: open bag
-    }
-
-    template<T>
-    void   BagPlayer::register_callback(const std::string &topic,
-            boost::function<void (boost::shared_ptr<T> &)> f) {
-        cbs_[topic] = new BagCallbackT<T>(f);
-    }
-
-    void BagPlayer::start_play() {
-
-        std::vector<std::string> topic;
-        foreach(std::pair<std::string, BagCallback *> const cb, cbs_)
-            topics.push_back(me.first);
-
-        View view(bag, TopicQuery(topics));
-
-        foreach(rosbag::MessageInstance const m, view)
-        {
-            //TODO: handle delay, and pass message to appropriate callback
-        }
-    }
-
-    struct BagCallback
-    {
-        virtual void call(MessageInstance m) = 0;
-    };
-
-    template<T>
-        class BagCallbackT : BagCallback
-    {
-        public:
-            BagCallback(boost::function<void (boost::shared_ptr<T> &)> f) :
-                cb_(f)
-        {}
-
-            void call(MessageInstance m) {
-                cb_(m.instantiate<T>());
-            }
-
-        private:
-            boost::function<void (boost::shared_ptr<T> &)> cb_;
-    };
-
-}
-
-void chatters_callback(std_msgs::StringPtr &s) {
+void chatters_callback(std_msgs::String::Ptr s) {
     log("chatter message played: %s", s->data.c_str());
 }
 
-void numbers_callback(std_msgs::Int32Ptr &i) {
+void numbers_callback(std_msgs::Int32::Ptr i) {
     log("numbers message played: %d", i->data);
 }
 
@@ -107,7 +40,6 @@ void play_bag() {
 
     bag_player.start_play();
 }
-
 
 /* android stuff below */
 

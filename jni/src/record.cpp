@@ -5,15 +5,14 @@
 #include <vector>
 #include <android/log.h>
 #include <boost/bind.hpp>
+#include <boost/format.hpp>
 
 #include <android_native_app_glue.h>
 
 #include <std_msgs/String.h>
 #include <std_msgs/Int32.h>
 
-#include "bag_player.hpp"
-
-rosbag::BagPlayer *bp;
+#include <rosbag/bag.h>
 
 void log(const char *msg, ...) {
     va_list args;
@@ -24,32 +23,46 @@ void log(const char *msg, ...) {
 
 #define LASTERR strerror(errno)
 
-void chatters_callback(std_msgs::String::Ptr s) {
-    log("chatter message played: %s", s->data.c_str());
-    ros::Time t = bp->get_time();
-    log("time: %fs", t.toSec());
-}
+rosbag::Bag bag;
 
-void numbers_callback(std_msgs::Int32::Ptr i) {
-    log("numbers message played: %d", i->data);
-    ros::Time t = bp->get_time();
-    log("time: %fs", t.toSec());
-}
-
-void play_bag() {
+void open_bag() {
+    log("opening bag");
     try {
-        rosbag::BagPlayer bag_player("/sdcard/test.bag");
-        bp = &bag_player;
-
-        bag_player.register_callback<std_msgs::Int32>("numbers",
-                boost::bind(numbers_callback, _1));
-        bag_player.register_callback<std_msgs::String>("chatter",
-                boost::bind(chatters_callback, _1));
-
-        bag_player.start_play();
+        bag.open("/sdcard/test.bag", rosbag::bagmode::Write);
     } catch (rosbag::BagException e) {
-        log("error while replaying: %s, %s", e.what(), LASTERR);
+        log("could not open bag file for writing: %s, %s", e.what(), LASTERR);
         return;
+    }
+}
+
+void record_message(rosbag::Bag &b) {
+
+    static int count = 0;
+
+    std_msgs::String str;
+    str.data = boost::str(boost::format("foo%1%") % count);
+
+    std_msgs::Int32 i;
+    i.data = count;
+
+    log("writing stuff into bag");
+    try {
+        bag.write("chatter", ros::Time::now(), str);
+        bag.write("numbers", ros::Time::now(), i);
+    } catch (const std::exception &e) {
+        log("Oops! could not write to bag: %s, %s", e.what(), strerror(errno));
+        return;
+    }
+}
+
+int32_t handle_event(android_app *app, AInputEvent *e) {
+    record_message(bag);
+    return 0;
+}
+
+void handle_cmd(android_app *app, int32_t c) {
+    if (c == APP_CMD_LOST_FOCUS) {
+        bag.close();
     }
 }
 
@@ -62,6 +75,7 @@ void ev_loop(android_app *papp) {
     android_poll_source *ps;
 
     log("starting event loop");
+    ros::Time::init();
 
     while (true) {
         lr = ALooper_pollAll(-1, NULL, &le, (void **) &ps);
@@ -71,7 +85,8 @@ void ev_loop(android_app *papp) {
         if (ps) {
             log("event received");
             if (first) {
-                play_bag();
+                open_bag();
+                papp->onInputEvent = handle_event;
                 first = false;
             }
             ps->process(papp, ps);

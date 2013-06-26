@@ -52,7 +52,7 @@ template<class T>
 class BagCallbackT : public BagCallback
 {
 public:
-    typedef boost::function<void (boost::shared_ptr<T>)> Callback;
+    typedef boost::function<void (const boost::shared_ptr<const T>&)> Callback;
 
     BagCallbackT(Callback cb) :
         cb_(cb)

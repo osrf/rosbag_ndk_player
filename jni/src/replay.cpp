@@ -24,13 +24,13 @@ void log(const char *msg, ...) {
 
 #define LASTERR strerror(errno)
 
-void chatters_callback(std_msgs::String::Ptr s) {
+void chatters_callback(const std_msgs::String::ConstPtr& s) {
     log("chatter message played: %s", s->data.c_str());
     ros::Time t = bp->get_time();
     log("time: %fs", t.toSec());
 }
 
-void numbers_callback(std_msgs::Int32::Ptr i) {
+void numbers_callback(const std_msgs::Int32::ConstPtr& i) {
     log("numbers message played: %d", i->data);
     ros::Time t = bp->get_time();
     log("time: %fs", t.toSec());

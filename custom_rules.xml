@@ -1,7 +1,7 @@
 <project name="custom_rules" default="debug">
     <target name="-pre-build">
-        <exec executable="/Users/paul/rba/android-ndk-r8e/ndk-build" failonerror="true">
-            <env key="NDK_MODULE_PATH" path="/Users/paul/rba/rba_scripts" />
+        <exec executable="/home/tfoote/android/android-ndk-r8e/ndk-build" failonerror="true">
+            <env key="NDK_MODULE_PATH" path="/data/moto/out:/data/moto/out/rosbag_ndk_player/jni" />
         </exec>
     </target>
 </project>

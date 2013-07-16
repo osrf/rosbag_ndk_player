@@ -58,7 +58,7 @@ void testbag() {
 
     log("opening bag");
     try {
-        bag.open("/sdcard/test.bag", rosbag::bagmode::Write);
+        bag.open("/sdcard/test2.bag", rosbag::bagmode::Write);
     } catch (rosbag::BagException e) {
         log("could not open bag file for writing: %s, %s", e.what(), LASTERR);
         return;
@@ -97,13 +97,19 @@ void testbag() {
 
 void play_bag() {
     try {
-        rosbag::BagPlayer bag_player("/sdcard/test.bag");
+        rosbag::BagPlayer bag_player("/sdcard/test2.bag");
         bp = &bag_player;
 
         bag_player.register_callback<sensor_msgs::Image>("images",
                 boost::bind(image_callback, _1));
         bag_player.register_callback<sensor_msgs::Imu>("imu",
                 boost::bind(imu_callback, _1));
+
+        bag_player.start_play();
+        
+        bag_player.set_time_scale(0.5);
+        bag_player.start_play();
+        bag_player.set_time_scale(2.0);
 
         bag_player.start_play();
     } catch (rosbag::BagException e) {

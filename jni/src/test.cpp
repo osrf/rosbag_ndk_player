@@ -3,16 +3,18 @@
 #include <string.h>
 #include <errno.h>
 #include <vector>
+#include <time.h>
 #include <android/log.h>
-#include "rosbag/bag.h"
-#include "rosbag/view.h"
-
-#include "std_msgs/String.h"
-#include "std_msgs/Int32.h"
-
-#include <boost/foreach.hpp>
+#include <boost/bind.hpp>
 
 #include <android_native_app_glue.h>
+
+#include <sensor_msgs/Image.h>
+#include <sensor_msgs/Imu.h>
+
+#include "rosbag/bag_player.h"
+
+rosbag::BagPlayer *bp;
 
 void log(const char *msg, ...) {
     va_list args;
@@ -21,36 +23,31 @@ void log(const char *msg, ...) {
     va_end(args);
 }
 
+
+
+// from android samples
+/* return current time in seconds */
+static double now(void) {
+
+  struct timespec res;
+  clock_gettime(CLOCK_REALTIME, &res);
+  return res.tv_sec + (double) res.tv_nsec / 1e9;
+
+}
+
+
 #define LASTERR strerror(errno)
-#define foreach BOOST_FOREACH
 
-void readbag() {
-    rosbag::Bag bag;
-    try {
-    bag.open("/sdcard/test.bag", rosbag::bagmode::Read);
-    } catch (rosbag::BagException e) {
-        log("could not open bag file for reading: %s, %s", e.what(), LASTERR);
-        return;
-    }
+void imu_callback(const sensor_msgs::Imu::ConstPtr& s) {
+  log("sensor_msgs::Imu recived on /imu with time %s", s->header.stamp.toSec());
+  ros::Time t = bp->get_time();
+  log("time: %f realtime %g", t.toSec(), now());
+}
 
-    std::vector<std::string> topics;
-    topics.push_back(std::string("chatter"));
-    topics.push_back(std::string("numbers"));
-
-    rosbag::View view(bag, rosbag::TopicQuery(topics));
-
-    foreach(rosbag::MessageInstance const m, view)
-    {
-        std_msgs::String::ConstPtr s = m.instantiate<std_msgs::String>();
-        if (s != NULL)
-            log("this should read 'foo': %s", s->data.c_str());
-
-        std_msgs::Int32::ConstPtr i = m.instantiate<std_msgs::Int32>();
-        if (i != NULL)
-            log("this should read 42: %d", i->data);
-    }
-
-    bag.close();
+void image_callback(const sensor_msgs::Image::ConstPtr& i) {
+  log("sensor_msgs::Image on /images with time %g played:", i->header.stamp.toSec());
+  ros::Time t = bp->get_time();
+  log("time: %f realtime %g", t.toSec(), now());
 }
 
 void testbag() {
@@ -67,16 +64,27 @@ void testbag() {
         return;
     }
 
-    std_msgs::String str;
-    str.data = std::string("foo");
+    sensor_msgs::Image image;
+    image.height = 480;
+    image.width = 640;
 
-    std_msgs::Int32 i;
-    i.data = 42;
+
+
+    sensor_msgs::Imu imu;
+    for (uint i = 0; i < 9; i++)
+    {
+      imu.orientation_covariance[i] = (double)i+1.0;
+    }
 
     log("writing stuff into bag");
     try {
-        bag.write("chatter", ros::Time::now(), str);
-        bag.write("numbers", ros::Time::now(), i);
+
+      for (double t = 0; t < 100; t++) {
+        ros::Time s = ros::Time::now() + ros::Duration().fromSec(t/30.0);
+        image.header.stamp = s;
+        bag.write("images", s , image);
+        bag.write("imu", s, imu);
+      }
     } catch (const std::exception &e) {
         log("Oops! could not write to bag: %s, %s", e.what(), strerror(errno));
         return;
@@ -86,14 +94,32 @@ void testbag() {
     bag.close();
 }
 
+
+void play_bag() {
+    try {
+        rosbag::BagPlayer bag_player("/sdcard/test.bag");
+        bp = &bag_player;
+
+        bag_player.register_callback<sensor_msgs::Image>("images",
+                boost::bind(image_callback, _1));
+        bag_player.register_callback<sensor_msgs::Imu>("imu",
+                boost::bind(imu_callback, _1));
+
+        bag_player.start_play();
+    } catch (rosbag::BagException e) {
+        log("error while replaying: %s, %s", e.what(), LASTERR);
+        return;
+    }
+}
+
+/* android stuff below */
+
 void ev_loop(android_app *papp) {
     int32_t lr;
     int32_t le;
     bool first = true;
     bool second = false;
     android_poll_source *ps;
-
-    app_dummy();
 
     log("starting event loop");
 
@@ -105,14 +131,13 @@ void ev_loop(android_app *papp) {
         if (ps) {
             log("event received");
             if (first) {
-                log("ready? launching rosbag write!");
                 testbag();
                 first = false;
                 second = true;
             }
             if (second) {
                 log("ready? launching rosbag read!");
-                readbag();
+                play_bag();
                 second = false;
             }
             ps->process(papp, ps);
@@ -125,5 +150,6 @@ void ev_loop(android_app *papp) {
 }
 
 void android_main(android_app *papp) {
+    app_dummy();
     ev_loop(papp);
 }

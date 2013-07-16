@@ -39,15 +39,15 @@ static double now(void) {
 #define LASTERR strerror(errno)
 
 void imu_callback(const sensor_msgs::Imu::ConstPtr& s) {
-  log("sensor_msgs::Imu recived on /imu with time %s", s->header.stamp.toSec());
+  log("------------ sensor_msgs::Imu recived on /imu with time %f", s->header.stamp.toSec());
   ros::Time t = bp->get_time();
-  log("time: %f realtime %g", t.toSec(), now());
+  log("time: %f realtime: %f diff: %f", t.toSec(), now(), now() - t.toSec());
 }
 
 void image_callback(const sensor_msgs::Image::ConstPtr& i) {
-  log("sensor_msgs::Image on /images with time %g played:", i->header.stamp.toSec());
+  log("++++++++++++ sensor_msgs::Image on /images with time %f played:", i->header.stamp.toSec());
   ros::Time t = bp->get_time();
-  log("time: %f realtime %g", t.toSec(), now());
+  log("time: %f realtime: %f diff: %f", t.toSec(), now(), now() - t.toSec());
 }
 
 void testbag() {
@@ -80,10 +80,14 @@ void testbag() {
     try {
 
       for (double t = 0; t < 100; t++) {
-        ros::Time s = ros::Time::now() + ros::Duration().fromSec(t/30.0);
-        image.header.stamp = s;
-        bag.write("images", s , image);
+        ros::Time s = ros::Time::now() + ros::Duration().fromSec(t/120.0);
+        imu.header.stamp = s;
         bag.write("imu", s, imu);
+        if (t < 25.0) {
+          s = ros::Time::now() + ros::Duration().fromSec(t/30.0);
+          image.header.stamp = s;
+          bag.write("images", s , image);
+        }
       }
     } catch (const std::exception &e) {
         log("Oops! could not write to bag: %s, %s", e.what(), strerror(errno));
@@ -105,12 +109,16 @@ void play_bag() {
         bag_player.register_callback<sensor_msgs::Imu>("imu",
                 boost::bind(imu_callback, _1));
 
-        bag_player.start_play();
+        log("REALTIME REALTIME REALTIME");
+        bag_player.start_play();      
         
+        log("HALFTIME HALFTIME HALFTIME");
         bag_player.set_time_scale(0.5);
         bag_player.start_play();
-        bag_player.set_time_scale(2.0);
+        
 
+        log("DOUBLETIME DOUBLETIME DOUBLETIME");
+        bag_player.set_time_scale(2.0);
         bag_player.start_play();
     } catch (rosbag::BagException e) {
         log("error while replaying: %s, %s", e.what(), LASTERR);
